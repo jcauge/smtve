@@ -1,10 +1,12 @@
 import pandas as pd
-import sklearn as skl
+from sklearn import linear_model as lm
+from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt
 import numpy as np
 import time
 from scipy import stats
 import collections as cl
+from sklearn.model_selection import train_test_split
 
 ######################################
 ########  Start of the code ##########
@@ -47,9 +49,12 @@ ae19_obj = ae19_obj.dropna(axis = 0)
 ae20_obj = ae20_obj.dropna(axis = 0)
 
 # Deleting outliers using the FSCORE method
-
 ae15_obj = ae15_obj[(np.abs(stats.zscore(ae15_obj)) < 3).all(axis=1)]
 
+# Lengths of the data w/o outliers
+n15 = len(ae15_obj)
+n19 = len(ae19_obj)
+n20 = len(ae20_obj)
 
 
 ########################################
@@ -78,14 +83,96 @@ std15 = np.std(ae15_obj, axis = 0)
 std19 = np.std(ae19_obj, axis = 0)
 std20 = np.std(ae20_obj, axis = 0)
 
+# abs freq. (bearing temp)
 cnt15 = cl.Counter(ae15_obj['bearing_temp'])
 cnt15_mc = cnt15.most_common()
 cnt15_mc.sort()
 
+cnt19 = cl.Counter(ae19_obj['bearing_temp'])
+cnt19_mc = cnt19.most_common()
+cnt19_mc.sort()
+
+cnt20 = cl.Counter(ae20_obj['bearing_temp'])
+cnt20_mc = cnt20.most_common()
+cnt20_mc.sort()
+
 unicos15 = [item[0] for item in cnt15_mc]
 frec15 = [item[1] for item in cnt15_mc]
 
+unicos19 = [item[0] for item in cnt19_mc]
+frec19 = [item[1] for item in cnt19_mc]
 
-# plt.hist(ae15_obj['bearing_temp'], bins = len(unicos15), color='tan')
+unicos20 = [item[0] for item in cnt20_mc]
+frec20 = [item[1] for item in cnt20_mc]
+
+ # plt.hist(ae15_obj['bearing_temp'], bins = len(unicos15), color='tan')
 # plt.bar(unicos15, frec15, color ='tan')
 # plt.show
+
+# frecuencia relativa y acumulada
+frecrel_15 = [ item /n15 for item in frec15]
+frecrel_19 = [ item /n19 for item in frec19]
+frecrel_20 = [ item /n20 for item in frec20]
+
+freq_acu15 = np.cumsum(frec15).tolist()
+freq_acu19 = np.cumsum(frec19).tolist()
+freq_acu20 = np.cumsum(frec20).tolist()
+
+###### Medidas de posición: mediana, quartiles y IQR ########
+
+
+med15 = [np.median(ae15_obj[item]) for item in ae15_obj]
+med19 = [np.median(ae19_obj[item]) for item in ae19_obj]
+med20 = [np.median(ae20_obj[item]) for item in ae20_obj]
+
+quar15 = [ np.percentile(ae15_obj[item], [0,25,50,75,100]) for item in ae15_obj]
+quar19 = [ np.percentile(ae19_obj[item], [0,25,50,75,100]) for item in ae19_obj]
+quar20 = [ np.percentile(ae20_obj[item], [0,25,50,75,100]) for item in ae20_obj]
+
+IQR15 = quar15[3] - quar15[1]
+IQR19 = quar19[3] - quar19[1]
+IQR20 = quar20[3] - quar20[1]
+
+
+#################################################################
+#################################################################
+###################   Modelo de regresión   #####################
+#################################################################
+#################################################################
+
+######## Modelo para el aerogenerador 15 #############
+
+# Se crean los subsets target y feature
+Y15 = ae15_obj[['bearing_temp']]
+X15 = ae15_obj[['power', 'gen_1_speed', 'gen_bearing_temp', 'temp_oil_mult', 'temp_out_nacelle']]
+
+# Creamos subsets de training y test de las variables target y feature
+Y15_training, Y15_test = train_test_split(Y15, test_size = 0.3)
+X15_training, X15_test = train_test_split(X15, test_size = 0.3)
+
+
+
+# Entrenamos el modelo
+regr = lm.LinearRegression()
+regr.fit(X15_training, Y15_training)
+
+# se hacen las prediciones
+Y_pred = regr.predict(X15_test)
+# print(len(Y15_training), len(X15_training), len(Y15_test), len(X15_test), len(Y_pred))
+print(Y_pred)
+# # The coefficients
+print('Coefficients: \n', regr.coef_)
+# # The mean squared error
+print("Mean squared error: %.2f"
+      % mean_squared_error(Y15_test, Y_pred))
+# # Explained variance score: 1 is perfect prediction
+print('Variance score: %.2f' % r2_score(Y15_test, Y_pred))
+
+# # Plot outputs
+# plt.scatter(X15_test, Y15_test,  color='black')
+plt.scatter(X15_test, Y_pred, color='blue')
+
+plt.xticks(())
+plt.yticks(())
+
+plt.show()
